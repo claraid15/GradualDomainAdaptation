@@ -15,7 +15,7 @@ from sklearn.svm import SVC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 import lightgbm as lgb
 import logging
-
+import random
 
 #logging.getLogger("lightgbm").setLevel(logging.ERROR)
 
@@ -231,6 +231,7 @@ def rotated_mnist_60_conv_experiment():
 def set_seed(seed=42):
     tf.random.set_seed(seed)
     np.random.seed(seed)
+    random.seed(seed)
 
 def rotated_mnist_60_conv_experiment_simple():
     set_seed(42)
