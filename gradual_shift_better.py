@@ -16,6 +16,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 import lightgbm as lgb
 import logging
 
+
 #logging.getLogger("lightgbm").setLevel(logging.ERROR)
 
 def new_model_simple():
@@ -219,13 +220,20 @@ def experiment_results(save_name):
 
 
 def rotated_mnist_60_conv_experiment():
+    set_seed(42)
     run_experiment(
         dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/rot_mnist_60_conv.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
-    
+
+
+def set_seed(seed=42):
+    tf.random.set_seed(seed)
+    np.random.seed(seed)
+
 def rotated_mnist_60_conv_experiment_simple():
+    set_seed(42)
     run_experiment_simple(
         dataset_func=datasets.rotated_mnist_60_data_func_simple,  
         n_classes=10,  
