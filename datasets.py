@@ -219,6 +219,10 @@ def high_d_gaussians(d, var, n):
 
 
 # MNIST datasets.
+#Load, normalize and preprocess the MNIST dataset, convert it to floating
+#point numbers between 0 and 1, and expand the dimension to meet the input 
+# requirements of the deep learning model (add a channel dimension to represent grayscale images)
+
 
 def get_preprocessed_mnist():
     (train_x, train_y), (test_x, test_y) = mnist.load_data()
@@ -228,6 +232,21 @@ def get_preprocessed_mnist():
     test_x = np.expand_dims(np.array(test_x), axis=-1)
     return (train_x, train_y), (test_x, test_y)
 
+def get_preprocessed_mnist_simple():
+    (train_x, train_y), (test_x, test_y) = mnist.load_data()
+
+    train_x, test_x = train_x / 255.0, test_x / 255.0
+
+    # Flatten the image into a one-dimensional vector: from (28, 28) to (784,)
+    train_x = train_x.reshape(train_x.shape[0], -1)  # (60000, 784)
+    test_x = test_x.reshape(test_x.shape[0], -1)     # (10000, 784)
+
+    # Randomly shuffle the training set
+    train_x, train_y = shuffle(train_x, train_y)
+    
+    return (train_x, train_y), (test_x, test_y)
+
+#Randomly rotate the input image xs, with the rotation angle range between start_angle and end_angle
 
 def sample_rotate_images(xs, start_angle, end_angle):
     new_xs = []
@@ -252,6 +271,46 @@ def continually_rotate_images(xs, start_angle, end_angle):
     return np.array(new_xs)
 
 
+def sample_rotate_images_simple(xs, start_angle, end_angle):
+    new_xs = []
+    num_points = xs.shape[0]
+    for i in range(num_points):
+        if start_angle == end_angle:  
+            angle = start_angle
+        else:
+            angle = np.random.uniform(low=start_angle, high=end_angle)  # Randomly select angle
+        img = xs[i].reshape(28, 28)  #Convert the flattened image back to 2D (28x28) format
+        img = ndimage.rotate(img, angle, reshape=False)  
+        new_xs.append(img.reshape(-1))  # Flatten the rotated image back into a one-dimensional vector
+    return np.array(new_xs)
+
+
+#Rotate the input image with gradually increasing angles so that the rotation angle of each image gradually changes between start_angle and end_angle
+
+def continually_rotate_images(xs, start_angle, end_angle):
+    new_xs = []
+    num_points = xs.shape[0]
+    for i in range(num_points):
+        angle = float(end_angle - start_angle) / num_points * i + start_angle  
+        img = ndimage.rotate(xs[i], angle, reshape=False)
+        new_xs.append(img)
+    return np.array(new_xs)
+
+
+def continually_rotate_images_simple(xs, start_angle, end_angle):
+    new_xs = []
+    num_points = xs.shape[0]
+    for i in range(num_points):
+        angle = float(end_angle - start_angle) / num_points * i + start_angle
+        img = xs[i].reshape(28, 28)  
+        img = ndimage.rotate(img, angle, reshape=False)  
+        new_xs.append(img.reshape(-1))  
+    return np.array(new_xs)
+
+
+# According to the input training data and test data, rotate them according to different angle ranges to generate the rotated training set, validation set and test set.
+
+
 def _transition_rotation_dataset(train_x, train_y, test_x, test_y,
                                  source_angles, target_angles, inter_func,
                                  src_train_end, src_val_end, inter_end, target_end):
@@ -274,6 +333,31 @@ def _transition_rotation_dataset(train_x, train_y, test_x, test_y,
             dir_inter_x, dir_inter_y, trg_val_x, trg_val_y, trg_test_x, trg_test_y)
 
 
+
+def _transition_rotation_dataset_simple(train_x, train_y, test_x, test_y,
+                                 source_angles, target_angles, inter_func,
+                                 src_train_end, src_val_end, inter_end, target_end):
+    assert(target_end <= train_x.shape[0])
+    assert(train_x.shape[0] == train_y.shape[0])
+    src_tr_x, src_tr_y = train_x[:src_train_end], train_y[:src_train_end]
+    src_tr_x = sample_rotate_images_simple(src_tr_x, source_angles[0], source_angles[1])
+    src_val_x, src_val_y = train_x[src_train_end:src_val_end], train_y[src_train_end:src_val_end] #验证集
+    src_val_x = sample_rotate_images_simple(src_val_x, source_angles[0], source_angles[1])
+    tmp_inter_x, inter_y = train_x[src_val_end:inter_end], train_y[src_val_end:inter_end]
+    inter_x = inter_func(tmp_inter_x)
+    dir_inter_x = sample_rotate_images_simple(tmp_inter_x, target_angles[0], target_angles[1])
+    dir_inter_y = np.array(inter_y)
+    assert(inter_x.shape == dir_inter_x.shape)
+    trg_val_x, trg_val_y = train_x[inter_end:target_end], train_y[inter_end:target_end]
+    trg_val_x = sample_rotate_images_simple(trg_val_x, target_angles[0], target_angles[1])
+    trg_test_x, trg_test_y = test_x, test_y
+    trg_test_x = sample_rotate_images_simple(trg_test_x, target_angles[0], target_angles[1])
+    return (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y,
+            dir_inter_x, dir_inter_y, trg_val_x, trg_val_y, trg_test_x, trg_test_y)
+
+
+#Select the rotation angle according to the probability of dynamic change, gradually transition from the source domain angle to the target domain angle, and generate an image set with mixed rotation ang
+
 def dial_rotation_proportions(xs, source_angles, target_angles):
     N = xs.shape[0]
     new_xs = []
@@ -290,6 +374,8 @@ def dial_rotation_proportions(xs, source_angles, target_angles):
     return np.array(new_xs)
 
 
+#Generate a dataset where images are rotated from the source domain angle to the target domain angle at different scales
+
 def dial_proportions_rotated_dataset(train_x, train_y, test_x, test_y,
                                      source_angles, target_angles,
                                      src_train_end, src_val_end, inter_end, target_end):
@@ -305,6 +391,15 @@ def make_rotated_dataset(train_x, train_y, test_x, test_y,
                          src_train_end, src_val_end, inter_end, target_end):
     inter_func = lambda x: continually_rotate_images(x, inter_angles[0], inter_angles[1])
     return _transition_rotation_dataset(
+        train_x, train_y, test_x, test_y, source_angles, target_angles,
+        inter_func, src_train_end, src_val_end, inter_end, target_end)
+
+
+def make_rotated_dataset_simple(train_x, train_y, test_x, test_y,
+                         source_angles, inter_angles, target_angles,
+                         src_train_end, src_val_end, inter_end, target_end):
+    inter_func = lambda x: continually_rotate_images_simple(x, inter_angles[0], inter_angles[1]) 
+    return _transition_rotation_dataset_simple(
         train_x, train_y, test_x, test_y, source_angles, target_angles,
         inter_func, src_train_end, src_val_end, inter_end, target_end)
 
@@ -359,6 +454,8 @@ def make_mnist():
     train_x = train_x / 255.0
     return np.expand_dims(train_x, axis=-1), train_y
 
+
+#Mix the MNIST and SVHN datasets, select samples from two different datasets with a certain probability, and generate a mixed dataset with transition properties
 
 def make_mnist_svhn_dataset(num_examples, mnist_start_prob, mnist_end_prob):
     data = scipy.io.loadmat('mnist32_train.mat')
