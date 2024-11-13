@@ -122,7 +122,7 @@ def run_experiment_simple(
         student_func, teacher, inter_x, target_x=trg_eval_x,
         target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
     
-    # Calcul de la confiance pour toutes les données non supervisées
+    # Calcul de la confiance pour toutes les données non supervisées  
     all_confidences = []
     for i, x_batch in enumerate(inter_x.reshape(-1, interval, *inter_x.shape[1:])):
         probas = teacher.predict_proba(x_batch)
